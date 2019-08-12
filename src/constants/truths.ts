@@ -1,9 +1,8 @@
 import * as events from 'events'
-import { ITruth } from '../'
+import { ITruthObserver } from '../'
 
-export const VOID_TRUTH: ITruth = {
+export const VOID_TRUTH: ITruthObserver = {
   eventStream$: new events.EventEmitter(),
   id: 0,
   lastEventNumberRead: 0,
-  onLive$: new events.EventEmitter(),
 }
