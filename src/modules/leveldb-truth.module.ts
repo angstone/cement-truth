@@ -61,8 +61,8 @@ interface ITruthModuleState {
   db?: any
 }
 
-const state: ITruthModuleState = {
-  eventRegister$: new events.EventEmitter(),
+export const state: ITruthModuleState = {
+  eventRegister$: new events.EventEmitter().setMaxListeners(Infinity),
   levelDbPath: path.join(__dirname, DEFAULT_DB_NAME),
   registeringLock: false,
   startedAt: undefined,

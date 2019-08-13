@@ -8,6 +8,7 @@
     "clean": "node_modules/.bin/rimraf ./dist",
     "build": "npm run clean && ./node_modules/typescript/bin/tsc",
     "test": "node_modules/.bin/nodemon --config nodemon-test.json",
+    "test:overload": "APP_TEST_OVERLOAD=true node_modules/.bin/nodemon --config nodemon-test.json",
     "test:mocha": "node_modules/.bin/mocha",
     "test:coverage": "node_modules/.bin/nyc npm run test:mocha"
   },

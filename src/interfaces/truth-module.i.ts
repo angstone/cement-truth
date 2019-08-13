@@ -1,7 +1,7 @@
 import { IEvent, IEventTrusted, ITruthObserver } from './'
 
 export interface ITruthModule {
-  config?: (truthModuleConfig: any) => void
+  config?: (truthModuleConfig?: any) => void
   registerEvent: (event: IEvent) => Promise<number>
   releaseTruthObserver: (truthObserver: ITruthObserver) => void
   retrieveEvent: (eventNumber: number) => Promise<IEventTrusted>
