@@ -15,6 +15,7 @@ import {
   signature,
 } from '../'
 import {
+  ASKED_EVENT_GREATER_THEN_LAST_REGISTERED_ERROR,
   DEFAULT_DB_NAME,
   EVENT_STORE_VOID_ERROR,
   LeveldbTruthModule as truth,
@@ -150,6 +151,19 @@ describe('TruthModule', () => {
   })
 
   describe('retrieveAllEvents function', async () => {
+    it('should gracefully fail retrieveAllEventsFrom a number inexistent', async () => {
+      await truth.wipe()
+      await truth.stop()
+      try {
+        await truth.retrieveAllEventsFrom(9)
+      } catch (e) {
+        expect(e).to.be.not.undefined
+        expect(e.message).to.be.equals(
+          ASKED_EVENT_GREATER_THEN_LAST_REGISTERED_ERROR
+        )
+      }
+    })
+
     it('should retrieve many past events sequentially', async () => {
       await truth.wipe()
       const HOW_MANY_EVENTS_TO_TEST = 100

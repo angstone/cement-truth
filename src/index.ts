@@ -9,6 +9,8 @@ import {
 
 import { AGENTS, VOID_EVENT, VOID_TRUTH } from './constants'
 
+import { LeveldbTruthModule, TruthModule } from './modules'
+
 import {
   IAgent,
   IEvent,
@@ -37,5 +39,7 @@ export {
   logger,
   env,
   signature,
-  // basic
+  // modules
+  TruthModule,
+  LeveldbTruthModule,
 }

@@ -37,7 +37,7 @@ const LEVEL_DB_OPTIONS = {
   valueEncoding: 'json',
 }
 
-const ASKED_EVENT_GREATER_THEN_LAST_REGISTERED_ERROR = `The eventNumber
+export const ASKED_EVENT_GREATER_THEN_LAST_REGISTERED_ERROR = `The eventNumber
 provided for reading from is greater then last event registered
 `
 // const REGISTER_LOCKED_ERROR = 'The register is locked now. Please try later'
@@ -53,7 +53,7 @@ interface ITruthModuleState {
   starting: boolean
   lastEventNumber?: number
   // you must get rid of this somehow.. it IS a bad design!
-  registeringLock: boolean
+  // registeringLock: boolean
   truthObservers: ITruthObserver[]
   totalTruthsObservers: number
   eventRegister$: events.EventEmitter
@@ -64,7 +64,7 @@ interface ITruthModuleState {
 export const state: ITruthModuleState = {
   eventRegister$: new events.EventEmitter().setMaxListeners(Infinity),
   levelDbPath: path.join(__dirname, DEFAULT_DB_NAME),
-  registeringLock: false,
+  // registeringLock: false,
   startedAt: undefined,
   starting: false,
   totalTruthsObservers: 0,
@@ -111,11 +111,13 @@ const getLastEventNumber = async (): Promise<number> => {
       (err: any, numberOfEvents: number) => {
         if (err) {
           if (err.notFound) {
+            logger.dev('got last event number: 0 - empty')
             resolveToNumber(0)
           } else {
             error.fatal(EVENT_READ_ERROR, err)
           }
         } else {
+          logger.dev('got last event number: '+numberOfEvents)
           resolveToNumber(numberOfEvents)
         }
       }
@@ -210,18 +212,18 @@ const convertDbEventToEvent = (
   return eventRestored
 }
 
-const registerLockOpen = async () => {
-  while (state.registeringLock) {
-    await new Promise(resolve =>
-      setTimeout(resolve, EVENT_REGISTER_LOCK_REST_TIME)
-    )
-  }
-  state.registeringLock = true
-}
+// const registerLockOpen = async () => {
+//   while (state.registeringLock) {
+//     await new Promise(resolve =>
+//       setTimeout(resolve, EVENT_REGISTER_LOCK_REST_TIME)
+//     )
+//   }
+//   state.registeringLock = true
+// }
 
-const registerLockClose = async () => {
-  state.registeringLock = false
-}
+// const registerLockClose = async () => {
+//   state.registeringLock = false
+// }
 
 const retrieveEvent = async (eventNumber: number): Promise<IEventTrusted> => {
   if (!state.startedAt) {
@@ -262,6 +264,9 @@ const retrieveAllEventsFrom = async (
     // truthObserver.onLive$.setMaxListeners(Infinity)
 
     state.truthObservers.push(truthObserver)
+    logger.dev('attached new truth observer: ')
+    logger.dev(JSON.stringify(truthObserver))
+
 
     truthObserver.eventStream$.on('event', (eventRead: IEventTrusted) => {
         truthObserver.lastEventNumberRead = eventRead!.number
@@ -345,11 +350,13 @@ const releaseTruthObserver = (truthToRelease: ITruthObserver) => {
     state.truthObservers = state.truthObservers.filter(
       truth => truth.id !== truthToRelease.id
     )
+    logger.dev('dettached truth observer: ')
+    logger.dev(JSON.stringify(truthToRelease))
   }
 }
 
 const wipe = async () => {
-  await registerLockOpen()
+  // await registerLockOpen()
   state.truthObservers = []
   state.totalTruthsObservers = 0
   state.lastEventNumber = undefined
@@ -388,7 +395,7 @@ const wipe = async () => {
       })
     })
   }
-  await registerLockClose()
+  // await registerLockClose()
 }
 
 // const convertPositiveIntegerToBinary = (numberInteger: number): string => {
