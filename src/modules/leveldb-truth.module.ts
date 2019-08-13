@@ -1,8 +1,10 @@
 import * as events from 'events'
 import * as path from 'path'
+// for cleanup
 import * as rimraf from 'rimraf'
 /* tslint:disable:no-var-requires */
 const level = require('level')
+// for using integer++ as id
 const lexi = require('lexicographic-integer')
 
 import {
@@ -16,9 +18,13 @@ import {
   VOID_TRUTH,
 } from '../'
 
+// this key in db stores the current amount of events instead of a regular event
 const KEY_OF_AMOUNT_OF_EVENTS: number = 0
-export const DEFAULT_DB_NAME = 'esdb'
-export const EVENT_REGISTER_LOCK_REST_TIME: number = 1
+export const DEFAULT_DB_NAME = 'db'
+// try to increase that to give more time to db to work and shortening load effort
+// tried that with no success.. avoid this design!
+export const EVENT_REGISTER_LOCK_REST_TIME: number = 10
+// this is funny but its a bad design, you know that
 export const PATIENCE_FOR_WAITING_TO_REGISTER: number = 70 * 7
 export const EVENT_STORE_VOID_ERROR = 'NO EVENTS YET, VOID STORE'
 const LEVEL_DB_OPTIONS = {
@@ -34,8 +40,7 @@ const LEVEL_DB_OPTIONS = {
 const ASKED_EVENT_GREATER_THEN_LAST_REGISTERED_ERROR = `The eventNumber
 provided for reading from is greater then last event registered
 `
-const VOID_EVENT_READ_ON_STREAM_ERROR = 'VOID_EVENT_READ_ON_STREAM_ERROR'
-const REGISTER_LOCKED_ERROR = 'The register is locked now. Please try later'
+// const REGISTER_LOCKED_ERROR = 'The register is locked now. Please try later'
 export const EVENT_NOT_FOUND_ERROR = `The event was not found in db.`
 const EVENT_READ_ERROR = `EVENT_READ_ERROR`
 
@@ -47,21 +52,22 @@ interface ITruthModuleState {
   startedAt?: number
   starting: boolean
   lastEventNumber?: number
+  // you must get rid of this somehow.. it IS a bad design!
   registeringLock: boolean
   truthObservers: ITruthObserver[]
-  totalTruths: number
-  eventRegistered$: events.EventEmitter
+  totalTruthsObservers: number
+  eventRegister$: events.EventEmitter
   levelDbPath: string
   db?: any
 }
 
 const state: ITruthModuleState = {
-  eventRegistered$: new events.EventEmitter(),
+  eventRegister$: new events.EventEmitter(),
   levelDbPath: path.join(__dirname, DEFAULT_DB_NAME),
   registeringLock: false,
   startedAt: undefined,
   starting: false,
-  totalTruths: 0,
+  totalTruthsObservers: 0,
   truthObservers: [],
 }
 
@@ -98,10 +104,27 @@ const start = async () => {
   }
 }
 
+const getLastEventNumber = async (): Promise<number> => {
+  return new Promise<number>(resolveToNumber => {
+    state.db!.get(
+      KEY_OF_AMOUNT_OF_EVENTS,
+      (err: any, numberOfEvents: number) => {
+        if (err) {
+          if (err.notFound) {
+            resolveToNumber(0)
+          } else {
+            error.fatal(EVENT_READ_ERROR, err)
+          }
+        } else {
+          resolveToNumber(numberOfEvents)
+        }
+      }
+    )
+  })
+}
+
 const stop = async () => {
   if (state.startedAt) {
-    state.startedAt = undefined
-
     state.truthObservers.forEach((truth: ITruthObserver) => {
       releaseTruthObserver(truth)
     })
@@ -116,6 +139,8 @@ const stop = async () => {
       })
     })
     logger.note('LeveldbTruthModule stopped at ' + Date.now())
+
+    state.startedAt = undefined
   }
 }
 
@@ -124,14 +149,14 @@ const registerEvent = async (event: IEvent): Promise<number> => {
     await start()
   }
 
-  let patience: number = 0
-  while (state.registeringLock) {
-    if (patience > PATIENCE_FOR_WAITING_TO_REGISTER) {
-      error.fatal(REGISTER_LOCKED_ERROR)
-    }
-    await new Promise(r => setTimeout(r, EVENT_REGISTER_LOCK_REST_TIME))
-    patience++
-  }
+  // let patience: number = 0
+  // while (state.registeringLock) {
+  //   if (patience > PATIENCE_FOR_WAITING_TO_REGISTER) {
+  //     error.fatal(REGISTER_LOCKED_ERROR)
+  //   }
+  //   await new Promise(r => setTimeout(r, EVENT_REGISTER_LOCK_REST_TIME))
+  //   patience++
+  // }
 
   const createdAt = Date.now()
 
@@ -143,7 +168,7 @@ const registerEvent = async (event: IEvent): Promise<number> => {
     type: event.type,
   }
 
-  return new Promise<number>(resolve => {
+  return new Promise<number>(resolveToNumber => {
     state
       .db!.batch()
       .put(eventToRegister.number, convertEventToDbEvent(eventToRegister))
@@ -152,8 +177,8 @@ const registerEvent = async (event: IEvent): Promise<number> => {
         if (err) {
           error.fatal(err)
         } else {
-          state.eventRegistered$.emit('registered', eventToRegister)
-          resolve(eventToRegister.number)
+          state.eventRegister$.emit('event', eventToRegister)
+          resolveToNumber(eventToRegister.number)
         }
       })
   })
@@ -217,25 +242,6 @@ const retrieveEvent = async (eventNumber: number): Promise<IEventTrusted> => {
   })
 }
 
-const getLastEventNumber = async (): Promise<number> => {
-  return new Promise<number>(resolveToNumber => {
-    state.db!.get(
-      KEY_OF_AMOUNT_OF_EVENTS,
-      (err: any, numberOfEvents: number) => {
-        if (err) {
-          if (err.notFound) {
-            resolveToNumber(0)
-          } else {
-            error.fatal(EVENT_READ_ERROR, err)
-          }
-        } else {
-          resolveToNumber(numberOfEvents)
-        }
-      }
-    )
-  })
-}
-
 const retrieveAllEventsFrom = async (
   eventNumberFrom: number
 ): Promise<ITruthObserver> => {
@@ -246,48 +252,82 @@ const retrieveAllEventsFrom = async (
     error.throw(ASKED_EVENT_GREATER_THEN_LAST_REGISTERED_ERROR)
     return VOID_TRUTH
   } else {
-    const truth: ITruthObserver = {
+    const truthObserver: ITruthObserver = {
       eventStream$: new events.EventEmitter(),
-      id: state.totalTruths++,
+      id: state.totalTruthsObservers++,
       lastEventNumberRead: eventNumberFrom - 1,
     }
 
-    // truth.eventStream$.setMaxListeners(Infinity)
-    // truth.onLive$.setMaxListeners(Infinity)
+    // truthObserver.eventStream$.setMaxListeners(Infinity)
+    // truthObserver.onLive$.setMaxListeners(Infinity)
 
-    state.truthObservers.push(truth)
+    state.truthObservers.push(truthObserver)
 
-    truth.eventStream$.on('event', (eventRead: IEventTrusted) => {
-      if (!eventRead) {
-        error.fatal(VOID_EVENT_READ_ON_STREAM_ERROR)
-      } else {
-        truth.lastEventNumberRead = eventRead.number
-      }
+    truthObserver.eventStream$.on('event', (eventRead: IEventTrusted) => {
+        truthObserver.lastEventNumberRead = eventRead!.number
     })
 
+    // this is a BAD REALLY REALLY BAD DESIGN AND I THINK THE FAULT IS HERE
     setImmediate(() => {
-      recursiveCheckIfTruthObserverIsInLiveBeforeRetrieveStream(truth)
+      recursiveCheckIfTruthObserverIsInLiveBeforeRetrieveStream(truthObserver)
     })
 
-    return truth
+    return truthObserver
   }
 }
 
-const getPromiseOfRetrieveFromToInTruth = async (truth: ITruthObserver) => {
+// this is a PIECE OF SHIT CODE
+const recursiveCheckIfTruthObserverIsInLiveBeforeRetrieveStream = async (
+  truthObserver: ITruthObserver
+) => {
+  if (truthObserver.lastEventNumberRead >= state.lastEventNumber!) {
+  //  await registerLockOpen()
+  //  if (truthObserver.lastEventNumberRead >= state.lastEventNumber!) {
+      truthObserver.registeredEventStreamCallback = (eventRegistered: IEventTrusted) => {
+        truthObserver.eventStream$.emit('event', eventRegistered!)
+      }
+
+      state.eventRegister$.on(
+        'event',
+        truthObserver.registeredEventStreamCallback
+      )
+
+      truthObserver.eventStream$.emit('live')
+
+      // await registerLockClose()
+    // } else {
+    //   await registerLockClose()
+    //   getPromiseOfRetrieveFromToInTruth(truthObserver).then(() => {
+    //     recursiveCheckIfTruthObserverIsInLiveBeforeRetrieveStream(truthObserver)
+    //   })
+    // }
+  } else {
+    getPromiseOfRetrieveFromToInTruth(truthObserver).then(() => {
+      recursiveCheckIfTruthObserverIsInLiveBeforeRetrieveStream(truthObserver)
+    })
+  }
+}
+
+const getPromiseOfRetrieveFromToInTruth = async (truthObserver: ITruthObserver) => {
   return new Promise(resolveOnEndOfStream => {
-    const fromNumber = truth.lastEventNumberRead + 1
+    const fromNumber = truthObserver.lastEventNumberRead + 1
     const toNumber = state.lastEventNumber!
-    truth.levelDbStream = state.db!.createReadStream({
+    truthObserver.levelDbStream = state.db!.createReadStream({
       gte: fromNumber,
       lte: toNumber,
     })
-    truth.levelDbStream.on('data', (record: any) => {
-      truth.eventStream$.emit(
+    const subscribedFunction = (record: any) => {
+      truthObserver.eventStream$.emit(
         'event',
         convertDbEventToEvent(record.key, record.value)
       )
+    }
+    truthObserver.levelDbStream.on('data', subscribedFunction)
+    truthObserver.levelDbStream.once('end', () => {
+      truthObserver.levelDbStream.off('data', subscribedFunction)
+      delete truthObserver.levelDbStream
+      resolveOnEndOfStream()
     })
-    truth.levelDbStream.once('end', resolveOnEndOfStream)
   })
 }
 
@@ -296,40 +336,6 @@ const retrieveAllEvents = async (): Promise<ITruthObserver> => {
     return Promise.reject(error.is(EVENT_STORE_VOID_ERROR))
   } else {
     return retrieveAllEventsFrom(1)
-  }
-}
-
-const recursiveCheckIfTruthObserverIsInLiveBeforeRetrieveStream = async (
-  truth: ITruthObserver
-) => {
-  if (truth.lastEventNumberRead >= state.lastEventNumber!) {
-    await registerLockOpen()
-    if (truth.lastEventNumberRead >= state.lastEventNumber!) {
-      truth.registeredEventStreamCallback = (eventRegistered: IEvent) => {
-        if (!eventRegistered) {
-          error.fatal(VOID_EVENT_READ_ON_STREAM_ERROR)
-        }
-        truth.eventStream$.emit('event', eventRegistered)
-      }
-
-      state.eventRegistered$.on(
-        'registered',
-        truth.registeredEventStreamCallback
-      )
-
-      truth.eventStream$.emit('live')
-
-      await registerLockClose()
-    } else {
-      await registerLockClose()
-      getPromiseOfRetrieveFromToInTruth(truth).then(() => {
-        recursiveCheckIfTruthObserverIsInLiveBeforeRetrieveStream(truth)
-      })
-    }
-  } else {
-    getPromiseOfRetrieveFromToInTruth(truth).then(() => {
-      recursiveCheckIfTruthObserverIsInLiveBeforeRetrieveStream(truth)
-    })
   }
 }
 
@@ -345,7 +351,7 @@ const releaseTruthObserver = (truthToRelease: ITruthObserver) => {
 const wipe = async () => {
   await registerLockOpen()
   state.truthObservers = []
-  state.totalTruths = 0
+  state.totalTruthsObservers = 0
   state.lastEventNumber = undefined
   if (state.startedAt) {
     await stop()

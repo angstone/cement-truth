@@ -3,13 +3,19 @@
 
 import { expect } from 'chai'
 // import { spy } from 'sinon'
-import { AGENTS, IEvent, IEventTrusted } from '../'
+import { AGENTS, ENVS, IEvent, IEventTrusted, LOGLEVELS, signature } from '../'
 import {
   EVENT_STORE_VOID_ERROR,
   LeveldbTruthModule as truth,
 } from './leveldb-truth.module'
 
 describe('TruthModule', () => {
+  before(() => {
+    process.env.APP_ENV = ENVS.DEV
+    process.env.APP_LOGLEVEL = LOGLEVELS.DEV_NOTE
+    signature()
+  })
+
   it('should exists', () => {
     expect(truth).to.be.exist
   })
@@ -35,6 +41,8 @@ describe('TruthModule', () => {
     },
     type: 'sample object',
   }
+
+  const agent = AGENTS.SYSTEM_DEVELOPER
 
   describe('wipe function', () => {
     it('should wipe events', async () => {
@@ -201,5 +209,131 @@ describe('TruthModule', () => {
       })
       await truth.stop()
     })
+
+    it('should retrieve a live event', async () => {
+      await truth.wipe()
+      const HOW_MANY_EVENTS_TO_TEST = 3
+      const eventTypes: string[] = []
+      for (let i = 1; i <= HOW_MANY_EVENTS_TO_TEST; i++) {
+        eventTypes.push('event type number ' + i + ' test')
+      }
+      await eventTypes.reduce(async (p, type: string) => {
+        await p
+        const eventNumber = await truth.registerEvent({ type, agent })
+        expect(eventNumber).to.be.at.least(1)
+      }, Promise.resolve())
+
+      const truthObs = await truth.retrieveAllEvents()
+
+      expect(truthObs).to.be.exist
+      expect(truthObs.id).to.be.an('number')
+      expect(truthObs.eventStream$).to.be.exist
+
+      const eventsGot: IEventTrusted[] = []
+      truthObs.eventStream$.on('event', event => {
+        expect(event).to.be.exist
+        eventsGot.push(event)
+      })
+      await new Promise(go => {
+        truthObs.eventStream$.once('live', () => {
+          expect(eventsGot).to.be.an('array')
+          expect(eventsGot.length).to.be.equals(HOW_MANY_EVENTS_TO_TEST)
+          eventTypes.forEach(eventType => {
+            expect(eventsGot.find(eventGot => eventGot.type === eventType)).to
+              .be.not.undefined
+          })
+          go()
+        })
+      })
+      const liveType = 'important live test'
+      const eventLiveNumber = await truth.registerEvent({
+        type: liveType,
+        agent,
+      })
+      await new Promise(r => setImmediate(r))
+      const eventLiveGot = eventsGot.pop()
+      expect(eventLiveGot!.type).to.be.equals(liveType)
+      expect(eventLiveGot!.number).to.be.equals(eventLiveNumber)
+    })
   })
+
+  describe('overload tasks', () => {
+    beforeEach(async () => {
+      await truth.stop()
+      await truth.wipe()
+    })
+
+    it('should retrieve all past events from given eventNumber in sequence', async () => {
+      await truth.start()
+      const HOW_MANY_EVENTS_TO_TEST = 50000
+      const EVENT_NUMBER_FROM = 793
+      const eventTypes: string[] = []
+      for (let i = 1; i <= HOW_MANY_EVENTS_TO_TEST; i++) {
+        eventTypes.push('event type number ' + i + ' test')
+      }
+
+      await eventTypes.reduce(async (p, type: string) => {
+        await p
+        const eventNumber = await truth.registerEvent({ type, agent })
+        expect(eventNumber).to.be.at.least(1)
+      }, Promise.resolve())
+
+      const truthObs = await truth.retrieveAllEventsFrom(EVENT_NUMBER_FROM)
+      const eventsGot: IEventTrusted[] = []
+      truthObs.eventStream$.on('event', event => {
+        eventsGot.push(event)
+      })
+
+      await new Promise(go => {
+        truthObs.eventStream$.once('live', () => {
+          expect(eventsGot.length).to.be.equals(
+            HOW_MANY_EVENTS_TO_TEST - EVENT_NUMBER_FROM + 1
+          )
+          eventTypes.forEach((eventType: string, eventTypeIndex: number) => {
+            if (eventTypeIndex + 1 >= EVENT_NUMBER_FROM) {
+              expect(eventsGot.find(eventGot => eventGot.type === eventType)).to
+                .be.not.undefined
+            } else {
+              expect(eventsGot.find(eventGot => eventGot.type === eventType)).to
+                .be.undefined
+            }
+          })
+          go()
+        })
+      })
+    }).timeout(50000) // end it test case
+
+    it('should retrieve all past events in parallel', async () => {
+      await truth.start()
+      const HOW_MANY_EVENTS_TO_TEST = 50000
+      const eventTypes: string[] = []
+      for (let i = 1; i <= HOW_MANY_EVENTS_TO_TEST; i++) {
+        eventTypes.push('event type number ' + i + ' test')
+      }
+
+      await Promise.all(
+        eventTypes.map(async (type: string) => {
+          const eventNumber = await truth.registerEvent({ type, agent })
+          expect(eventNumber).to.be.at.least(1)
+        })
+      )
+
+      const truthObs = await truth.retrieveAllEvents()
+      const eventsGot: IEventTrusted[] = []
+      truthObs.eventStream$.on('event', event => {
+        eventsGot.push(event)
+      })
+
+      await new Promise(go => {
+        truthObs.eventStream$.once('live', () => {
+          expect(eventsGot.length).to.be.equals(HOW_MANY_EVENTS_TO_TEST)
+          eventTypes.forEach((eventType: string, eventTypeIndex: number) => {
+            expect(eventsGot.find(eventGot => eventGot.type === eventType)).to
+              .be.not.undefined
+          })
+          go()
+        })
+      })
+    }).timeout(50000) // end it test case
+  }) // end describe
 })

@@ -11,4 +11,4 @@ dockers/data
 # nyc dump
 .nyc_output
 coverage
-src/modules/esdb/*
+src/modules/db

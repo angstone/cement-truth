@@ -1,4 +1,11 @@
-import { env, error, logger } from '@angstone/cement-basic'
+import {
+  env,
+  ENVS,
+  error,
+  logger,
+  LOGLEVELS,
+  signature,
+} from '@angstone/cement-basic'
 
 import { AGENTS, VOID_EVENT, VOID_TRUTH } from './constants'
 
@@ -13,6 +20,8 @@ import {
 
 export {
   // const
+  ENVS,
+  LOGLEVELS,
   AGENTS,
   VOID_TRUTH,
   VOID_EVENT,
@@ -27,5 +36,6 @@ export {
   error,
   logger,
   env,
+  signature,
   // basic
 }
