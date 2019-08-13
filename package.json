@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "rimraf": "^2.6.3",
-    "@angstone/cement-basic": "^1.0.0",
+    "@angstone/cement-basic": "^1.0.1",
     "events": "^3.0.0",
     "level": "^5.0.1",
     "lexicographic-integer": "^1.1.0",

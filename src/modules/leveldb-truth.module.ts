@@ -324,7 +324,7 @@ const getPromiseOfRetrieveFromToInTruth = async (truthObserver: ITruthObserver) 
     }
     truthObserver.levelDbStream.on('data', subscribedFunction)
     truthObserver.levelDbStream.once('end', () => {
-      truthObserver.levelDbStream.off('data', subscribedFunction)
+      truthObserver.levelDbStream.removeListener('data', subscribedFunction)
       delete truthObserver.levelDbStream
       resolveOnEndOfStream()
     })
