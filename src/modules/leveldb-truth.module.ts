@@ -44,7 +44,7 @@ provided for reading from is greater then last event registered
 export const EVENT_NOT_FOUND_ERROR = `The event was not found in db.`
 const EVENT_READ_ERROR = `EVENT_READ_ERROR`
 
-export interface ITruthModuleConfig {
+export interface ILeveldbTruthModuleConfig {
   levelDbPath?: string
 }
 
@@ -71,7 +71,7 @@ export const state: ITruthModuleState = {
   truthObservers: [],
 }
 
-const config = (truthConfig?: ITruthModuleConfig) => {
+const config = (truthConfig?: ILeveldbTruthModuleConfig) => {
   if (truthConfig) {
     if (truthConfig.levelDbPath) {
       state.levelDbPath = truthConfig.levelDbPath

@@ -19,6 +19,7 @@ describe('TruthModule', () => {
 
   /* tslint:disable:no-empty */
   const mockTruth: ITruthModule = {
+    config: (some: any) => {},
     registerEvent: async (event: IEvent) => MOCK_EVENT_NUMBER,
     releaseTruthObserver: (truthObserver: ITruthObserver) => {},
     retrieveAllEvents: async () => VOID_TRUTH,
@@ -40,6 +41,7 @@ describe('TruthModule', () => {
 
   it('should link the functionalities', async () => {
     TruthModule.useTruthModule(mockTruth)
+    const configSpy = spy(mockTruth, 'config')
     const registerEventSpy = spy(mockTruth, 'registerEvent')
     const releaseTruthObserverSpy = spy(mockTruth, 'releaseTruthObserver')
     const retrieveAllEventsSpy = spy(mockTruth, 'retrieveAllEvents')
@@ -49,6 +51,7 @@ describe('TruthModule', () => {
     const stopSpy = spy(mockTruth, 'stop')
     const wipeSpy = spy(mockTruth, 'wipe')
 
+    TruthModule.config!(VOID_EVENT)
     await TruthModule.start()
     await TruthModule.stop()
     await TruthModule.wipe()
@@ -67,6 +70,7 @@ describe('TruthModule', () => {
     expect(truthObserverTwo).to.be.equals(truthObserver)
     expect(eventTrusted).to.be.equals(VOID_EVENT)
 
+    configSpy.should.have.been.calledWith(VOID_EVENT)
     startSpy.should.have.been.called
     stopSpy.should.have.been.called
     wipeSpy.should.have.been.called
@@ -76,6 +80,7 @@ describe('TruthModule', () => {
     retrieveAllEventsFromSpy.should.have.been.calledWith(MOCK_EVENT_NUMBER)
     retrieveEventSpy.should.have.been.calledWith(MOCK_EVENT_NUMBER)
 
+    configSpy.restore()
     startSpy.restore()
     stopSpy.restore()
     wipeSpy.restore()

@@ -17,6 +17,12 @@ const useTruthModule = (truthModule: ITruthModule) => {
   state.truthModule = truthModule
 }
 
+const config = (truthConfig?: any) => {
+  if(state.truthModule.config) {
+    state.truthModule.config(truthConfig)
+  }
+}
+
 const registerEvent = (event: IEvent): Promise<number> =>
   state.truthModule.registerEvent(event)
 
@@ -37,6 +43,7 @@ const stop = (): Promise<void> => state.truthModule.stop()
 const wipe = (): Promise<void> => state.truthModule.wipe()
 
 export const TruthModule: ITruthModuleWrapper = {
+  config,
   registerEvent,
   releaseTruthObserver,
   retrieveAllEvents,

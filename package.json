@@ -1,6 +1,6 @@
 {
   "name": "@angstone/cement-truth",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Store Level Zero Of Cement Framework: an EventStore",
   "main": "dist/index.js",
   "scripts": {
