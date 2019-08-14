@@ -1,3 +1,11 @@
+<a name="1.0.1"></a>
+## 1.0.1 (2019-08-14)
+
+
+* fixed missing config function in TruthModule wrapper 0dc0f83
+
+
+
 <a name="1.0.0"></a>
 # 1.0.0 (2019-08-13)
 
